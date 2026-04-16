@@ -1,0 +1,1606 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crypto Twitter Sentiment · 4-Year Cycle Analysis</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #08090c;
+    --surface: #0f1117;
+    --border: #1e2130;
+    --text: #e8eaf0;
+    --muted: #6a7585;
+    --accent: #f0a500;
+    --accent2: #00d4ff;
+    --font-mono: 'IBM Plex Mono', 'Fira Mono', 'Cascadia Code', monospace;
+    --font-display: 'Syne', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.6;
+  }
+
+  header {
+    padding: 48px 48px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-size: clamp(28px, 4vw, 52px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: var(--text);
+  }
+
+  h1 span { color: var(--accent); }
+
+  .header-sub {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 12px;
+    max-width: 700px;
+    line-height: 1.75;
+    font-weight: 300;
+  }
+
+  /* CONTROLS */
+  .controls {
+    padding: 24px 48px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ctrl-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-right: 4px;
+  }
+
+  .tab-group { display: flex; gap: 2px; }
+
+  .tab {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 7px 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.04em;
+  }
+
+  .tab:hover { border-color: var(--accent); color: var(--text); }
+  .tab.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 500; }
+
+  .separator { width: 1px; height: 28px; background: var(--border); margin: 0 8px; }
+
+  .metric-pill {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.04em;
+    border-radius: 2px;
+  }
+
+  .metric-pill:hover { border-color: var(--accent2); color: var(--text); }
+  .metric-pill.active { background: transparent; border-color: var(--accent2); color: var(--accent2); }
+
+  main { padding: 32px 48px; }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* HEATMAP */
+  .heatmap-wrap { overflow-x: auto; padding-bottom: 8px; }
+
+  /* calendar: left-label + 12 months + right price label */
+  .heatmap.calendar-view {
+    display: grid;
+    grid-template-columns: 72px repeat(12, 1fr) 90px;
+    gap: 2px;
+    min-width: 860px;
+  }
+
+  /* cycle: left-label + 12 months + right price label */
+  .heatmap.cycle-view {
+    display: grid;
+    grid-template-columns: 90px repeat(12, 1fr) 90px;
+    gap: 2px;
+    min-width: 940px;
+  }
+
+  .hm-header {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: center;
+    padding: 4px 2px;
+  }
+
+  .hm-row-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding-right: 6px;
+    white-space: nowrap;
+  }
+
+  .hm-row-label.year-label {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .hm-price-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: #3a4555;
+    display: flex;
+    align-items: center;
+    padding-left: 8px;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+    line-height: 1.3;
+  }
+
+  .cell {
+    aspect-ratio: 1.6;
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.1s, outline 0.1s;
+    min-height: 26px;
+  }
+
+  .cell:hover {
+    transform: scale(1.15);
+    z-index: 10;
+    outline: 1.5px solid rgba(255,255,255,0.4);
+  }
+
+  .cell.no-data {
+    background: #1c2030;
+    border: none;
+    cursor: default;
+  }
+
+  .cell.projected {
+    background: #1c2030 !important;
+    border: none;
+    cursor: default;
+    opacity: 1 !important;
+  }
+
+  /* correlation score label inside cell */
+  .cell-score {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    pointer-events: none;
+    line-height: 1;
+    text-shadow: 0 0 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.7);
+  }
+
+  .score-aligned   { color: #00ff88; }
+  .score-hot       { color: #ffcc00; }
+  .score-cold      { color: #66aaff; }
+  .score-diverging { color: #ff6666; }
+
+  /* TOOLTIP */
+  .tooltip {
+    position: fixed;
+    background: #0a0b0f;
+    border: 1px solid var(--border);
+    padding: 14px 18px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.8;
+    pointer-events: none;
+    z-index: 9999;
+    max-width: 300px;
+    display: none;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.8);
+  }
+
+  .tooltip.visible { display: block; }
+
+  .tt-title {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+  }
+
+  .tt-row { display: flex; justify-content: space-between; gap: 16px; }
+  .tt-key { color: var(--muted); }
+  .tt-val { color: var(--text); font-weight: 500; }
+
+  .tt-narrative {
+    margin-top: 8px;
+    color: #8a9ab0;
+    font-size: 10px;
+    line-height: 1.65;
+    border-top: 1px solid var(--border);
+    padding-top: 6px;
+  }
+
+  /* LEGEND */
+  .legend {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .legend-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-right: 8px;
+  }
+
+  .legend-swatch { width: 20px; height: 14px; border-radius: 2px; display: inline-block; }
+
+  .legend-text {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--muted);
+    margin-right: 10px;
+  }
+
+  /* ICON LEGEND */
+  .icon-legend {
+    margin: 24px 0 0;
+    padding: 20px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 0;
+    align-items: flex-start;
+  }
+
+  .icon-legend-title {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    width: 100%;
+    margin-bottom: 14px;
+  }
+
+  .icon-legend-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 180px;
+    padding-right: 24px;
+  }
+
+  .icon-legend-group-title {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+
+  .icon-legend-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1;
+    padding: 2px 0;
+  }
+
+  .year-icon {
+    font-size: 14px;
+    line-height: 1;
+    display: inline-block;
+    width: 20px;
+    text-align: center;
+    filter: drop-shadow(0 0 4px currentColor);
+  }
+
+  .icon-year-num {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 12px;
+    min-width: 36px;
+  }
+
+  .icon-year-desc {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+    font-weight: 300;
+  }
+
+  .year-peak    { color: #f0a500; }
+  .year-crash   { color: #ff3a3a; }
+  .year-accum   { color: #bf5fff; }
+  .year-recover { color: #00ff88; }
+  .year-future  { color: #445566; }
+
+  /* INSIGHTS */
+  .insights {
+    margin-top: 40px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+  }
+
+  .insight-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 20px;
+  }
+
+  .ic-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .ic-title {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: var(--text);
+  }
+
+  .ic-body {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.8;
+    font-weight: 300;
+  }
+
+  .ic-body strong { color: var(--text); font-weight: 500; }
+
+  footer {
+    margin-top: 60px;
+    padding: 24px 48px;
+    border-top: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.9;
+    font-weight: 300;
+  }
+
+  /* HEADER ACCURACY BADGE */
+  .header-score-badge {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 14px 20px;
+    min-width: 160px;
+    text-align: center;
+  }
+  .hsb-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .hsb-score {
+    font-family: var(--font-display);
+    font-size: 32px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .hsb-sub {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* YEAR SCORE BADGE (right of BTC price) */
+  .hm-year-score {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-left: 6px;
+    white-space: nowrap;
+    min-width: 48px;
+  }
+
+  /* CYCLE SCORE ROW */
+  .cycle-score-row {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0 4px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+  }
+  .csr-label { color: var(--muted); }
+  .csr-score { font-weight: 500; font-size: 13px; }
+  .csr-bar-wrap { flex: 1; height: 4px; background: #1e2130; border-radius: 2px; max-width: 200px; }
+  .csr-bar { height: 100%; border-radius: 2px; transition: width 0.4s; }
+
+  /* pre-CT era fading */
+  .pre-ct { opacity: 0.6; }
+  .pre-ct-dagger { color: #445566; font-size: 8px; vertical-align: super; margin-left: 1px; }
+
+  @media (max-width: 600px) {
+    header, .controls, main, footer { padding-left: 20px; padding-right: 20px; }
+    h1 { font-size: 26px; }
+  }
+    header, .controls, main, footer { padding-left: 20px; padding-right: 20px; }
+    h1 { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-eyebrow">▸ Crypto Twitter / YouTube · AI-Synthesized Sentiment Analysis</div>
+  <h1>The 4-Year <span>Psych Cycle</span></h1>
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex-wrap:wrap;">
+    <p class="header-sub">Monthly sentiment reconstruction across Bitcoin Talk, Reddit &amp; Crypto Twitter, 2011–2030. Tracking bullish/bearish score, FOMO intensity, fear/capitulation, and dominant narrative theme. Cycle peaks: Jun 2011 · Dec 2013 · Dec 2017 · Nov 2021 · Nov 2025.</p>
+    <div id="header-score-badge" style="flex-shrink:0;">
+    <div class="header-score-badge">
+      <div class="hsb-label">Cycle 3 Accuracy Score</div>
+      <div class="hsb-score" style="color:#ffcc00">83%</div>
+      <div class="hsb-sub">Moderately Tracking<br>39 months vs prior avg</div>
+    </div>
+  </div>
+  </div>
+</header>
+
+<div class="controls">
+  <span class="ctrl-label">View</span>
+  <div class="tab-group">
+    <button class="tab active" onclick="setView(&#39;calendar&#39;)">Calendar (Year × Month)</button>
+    <button class="tab" onclick="setView(&#39;cycle&#39;)">Cycle Overlay (Aligned)</button>
+  </div>
+  <div class="separator"></div>
+  <span class="ctrl-label">Metric</span>
+  <button class="metric-pill active" onclick="setMetric(&#39;sentiment&#39;)">Sentiment Score</button>
+  <button class="metric-pill" onclick="setMetric(&#39;fomo&#39;)">FOMO Intensity</button>
+  <button class="metric-pill" onclick="setMetric(&#39;fear&#39;)">Fear Level</button>
+</div>
+
+<main>
+  <div class="section-title" id="section-title">Calendar View — Sentiment Score (−5 to +5)</div>
+  <div class="heatmap-wrap">
+    <div class="heatmap calendar-view" id="heatmap" style="grid-template-columns: 72px repeat(12, 1fr) 90px 54px;"><div class="hm-header"></div><div class="hm-header">Jan</div><div class="hm-header">Feb</div><div class="hm-header">Mar</div><div class="hm-header">Apr</div><div class="hm-header">May</div><div class="hm-header">Jun</div><div class="hm-header">Jul</div><div class="hm-header">Aug</div><div class="hm-header">Sep</div><div class="hm-header">Oct</div><div class="hm-header">Nov</div><div class="hm-header">Dec</div><div class="hm-header">BTC Range</div><div class="hm-header">Yr Sim</div><div class="hm-row-label year-label " style="opacity: 0.65;"><span class="year-icon year-peak" style="font-size:12px">★</span><span class="year-peak" style="font-family:&#39;Syne&#39;,sans-serif;font-weight:700;font-size:13px">2011</span></div><div class="cell" style="background: rgb(20, 65, 30);"></div><div class="cell" style="background: rgb(30, 88, 30);"></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="cell" style="background: rgb(140, 165, 20);"></div><div class="cell" style="background: rgb(140, 165, 20);"></div><div class="cell" style="background: rgb(240, 165, 0);"></div><div class="cell" style="background: rgb(20, 40, 25);"></div><div class="cell" style="background: rgb(25, 30, 100);"></div><div class="cell" style="background: rgb(25, 30, 100);"></div><div class="cell" style="background: rgb(28, 20, 75);"></div><div class="cell" style="background: rgb(28, 20, 75);"></div><div class="cell" style="background: rgb(25, 30, 100);"></div><div class="hm-price-label"><span>$0.3<br>– $31</span></div><div class="hm-year-score"></div><div class="hm-row-label year-label " style="opacity: 0.65;"><span class="year-icon year-recover" style="font-size:12px">↑</span><span class="year-recover" style="font-family:&#39;Syne&#39;,sans-serif;font-weight:700;font-size:13px">2012</span></div><div class="cell" style="background: rgb(23, 38, 95);"></div><div class="cell" style="background: rgb(20, 45, 90);"></div><div class="cell" style="background: rgb(20, 40, 25);"></div><div class="cell" style="background: rgb(20, 65, 30);"></div><div class="cell" style="background: rgb(20, 65, 30);"></div><div class="cell" style="background: rgb(30, 88, 30);"></div><div class="cell" style="background: rgb(20, 65, 30);"></div><div class="cell" style="background: rgb(30, 88, 30);"></div><div class="cell" style="background: rgb(30, 88, 30);"></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="cell" style="background: rgb(140, 165, 20);"></div><div class="hm-price-label"><span>$3.8<br>– $16</span></div><div class="hm-year-score"></div><div class="hm-row-label year-label " style="opacity: 0.65;"><span class="year-icon year-accum" style="font-size:12px">◈</span><span class="year-accum" style="font-family:&#39;Syne&#39;,sans-serif;font-weight:700;font-size:13px">2013</span></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="cell" style="background: rgb(140, 165, 20);"></div><div class="cell" style="background: rgb(240, 165, 0);"></div><div class="cell" style="background: rgb(30, 88, 30);"></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="cell" style="background: rgb(140, 165, 20);"></div><div class="cell" style="background: rgb(140, 165, 20);"></div><div class="cell" style="background: rgb(240, 165, 0);"></div><div class="cell" style="background: rgb(240, 165, 0);"></div><div class="hm-price-label"><span>$13<br>– $1k</span></div><div class="hm-year-score"></div><div class="hm-row-label year-label " style="opacity: 1;"><span class="year-icon year-crash" style="font-size:12px">☠</span><span class="year-crash" style="font-family:&#39;Syne&#39;,sans-serif;font-weight:700;font-size:13px">2014</span></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="cell" style="background: rgb(20, 65, 30);"></div><div class="cell" style="background: rgb(23, 38, 95);"></div><div class="cell" style="background: rgb(23, 38, 95);"></div><div class="cell" style="background: rgb(25, 30, 100);"></div><div class="cell" style="background: rgb(25, 30, 100);"></div><div class="cell" style="background: rgb(23, 38, 95);"></div><div class="cell" style="background: rgb(25, 30, 100);"></div><div class="cell" style="background: rgb(25, 30, 100);"></div><div class="cell" style="background: rgb(28, 20, 75);"></div><div class="cell" style="background: rgb(28, 20, 75);"></div><div class="cell" style="background: rgb(28, 20, 75);"></div><div class="hm-price-label"><span>$176<br>– $1k</span></div><div class="hm-year-score"></div><div class="hm-row-label year-label " style="opacity: 1;"><span class="year-icon year-recover" style="font-size:12px">↑</span><span class="year-recover" style="font-family:&#39;Syne&#39;,sans-serif;font-weight:700;font-size:13px">2015</span></div><div class="cell" style="background: rgb(30, 10, 50);"></div><div class="cell" style="background: rgb(28, 20, 75);"></div><div class="cell" style="background: rgb(28, 20, 75);"></div><div class="cell" style="background: rgb(25, 30, 100);"></div><div class="cell" style="background: rgb(25, 30, 100);"></div><div class="cell" style="background: rgb(23, 38, 95);"></div><div class="cell" style="background: rgb(23, 38, 95);"></div><div class="cell" style="background: rgb(20, 45, 90);"></div><div class="cell" style="background: rgb(20, 40, 25);"></div><div class="cell" style="background: rgb(20, 65, 30);"></div><div class="cell" style="background: rgb(20, 65, 30);"></div><div class="cell" style="background: rgb(30, 88, 30);"></div><div class="hm-price-label"><span>$152<br>– $504</span></div><div class="hm-year-score" style="color: rgb(102, 170, 255);">48%</div><div class="hm-row-label year-label " style="opacity: 1;"><span class="year-icon year-accum" style="font-size:12px">◈</span><span class="year-accum" style="font-family:&#39;Syne&#39;,sans-serif;font-weight:700;font-size:13px">2016</span></div><div class="cell" style="background: rgb(20, 65, 30);"></div><div class="cell" style="background: rgb(20, 65, 30);"></div><div class="cell" style="background: rgb(20, 65, 30);"></div><div class="cell" style="background: rgb(30, 88, 30);"></div><div class="cell" style="background: rgb(30, 88, 30);"></div><div class="cell" style="background: rgb(20, 65, 30);"></div><div class="cell" style="background: rgb(20, 45, 90);"></div><div class="cell" style="background: rgb(20, 65, 30);"></div><div class="cell" style="background: rgb(30, 88, 30);"></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="cell" style="background: rgb(140, 165, 20);"></div><div class="hm-price-label"><span>$354<br>– $998</span></div><div class="hm-year-score" style="color: rgb(0, 255, 136);">90%</div><div class="hm-row-label year-label " style="opacity: 1;"><span class="year-icon year-peak" style="font-size:12px">★</span><span class="year-peak" style="font-family:&#39;Syne&#39;,sans-serif;font-weight:700;font-size:13px">2017</span></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="cell" style="background: rgb(30, 88, 30);"></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="cell" style="background: rgb(140, 165, 20);"></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="cell" style="background: rgb(140, 165, 20);"></div><div class="cell" style="background: rgb(30, 88, 30);"></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="cell" style="background: rgb(140, 165, 20);"></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="cell" style="background: rgb(240, 165, 0);"></div><div class="cell" style="background: rgb(240, 165, 0);"></div><div class="hm-price-label"><span>$780<br>– $20k</span></div><div class="hm-year-score" style="color: rgb(0, 255, 136);">94%</div><div class="hm-row-label year-label " style="opacity: 1;"><span class="year-icon year-crash" style="font-size:12px">☠</span><span class="year-crash" style="font-family:&#39;Syne&#39;,sans-serif;font-weight:700;font-size:13px">2018</span></div><div class="cell" style="background: rgb(140, 165, 20);"></div><div class="cell" style="background: rgb(20, 65, 30);"></div><div class="cell" style="background: rgb(20, 45, 90);"></div><div class="cell" style="background: rgb(23, 38, 95);"></div><div class="cell" style="background: rgb(25, 30, 100);"></div><div class="cell" style="background: rgb(25, 30, 100);"></div><div class="cell" style="background: rgb(23, 38, 95);"></div><div class="cell" style="background: rgb(25, 30, 100);"></div><div class="cell" style="background: rgb(25, 30, 100);"></div><div class="cell" style="background: rgb(28, 20, 75);"></div><div class="cell" style="background: rgb(30, 10, 50);"></div><div class="cell" style="background: rgb(30, 10, 50);"></div><div class="hm-price-label"><span>$3k<br>– $17k</span></div><div class="hm-year-score" style="color: rgb(0, 255, 136);">97%</div><div class="hm-row-label year-label " style="opacity: 1;"><span class="year-icon year-recover" style="font-size:12px">↑</span><span class="year-recover" style="font-family:&#39;Syne&#39;,sans-serif;font-weight:700;font-size:13px">2019</span></div><div class="cell" style="background: rgb(28, 20, 75);"></div><div class="cell" style="background: rgb(25, 30, 100);"></div><div class="cell" style="background: rgb(23, 38, 95);"></div><div class="cell" style="background: rgb(20, 40, 25);"></div><div class="cell" style="background: rgb(30, 88, 30);"></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="cell" style="background: rgb(30, 88, 30);"></div><div class="cell" style="background: rgb(20, 40, 25);"></div><div class="cell" style="background: rgb(20, 45, 90);"></div><div class="cell" style="background: rgb(23, 38, 95);"></div><div class="cell" style="background: rgb(23, 38, 95);"></div><div class="cell" style="background: rgb(20, 45, 90);"></div><div class="hm-price-label"><span>$3k<br>– $14k</span></div><div class="hm-year-score" style="color: rgb(0, 255, 136);">87%</div><div class="hm-row-label year-label " style="opacity: 1;"><span class="year-icon year-accum" style="font-size:12px">◈</span><span class="year-accum" style="font-family:&#39;Syne&#39;,sans-serif;font-weight:700;font-size:13px">2020</span></div><div class="cell" style="background: rgb(20, 45, 90);"></div><div class="cell" style="background: rgb(20, 40, 25);"></div><div class="cell" style="background: rgb(28, 20, 75);"></div><div class="cell" style="background: rgb(20, 40, 25);"></div><div class="cell" style="background: rgb(30, 88, 30);"></div><div class="cell" style="background: rgb(20, 65, 30);"></div><div class="cell" style="background: rgb(30, 88, 30);"></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="cell" style="background: rgb(30, 88, 30);"></div><div class="cell" style="background: rgb(140, 165, 20);"></div><div class="cell" style="background: rgb(140, 165, 20);"></div><div class="cell" style="background: rgb(240, 165, 0);"></div><div class="hm-price-label"><span>$4k<br>– $29k</span></div><div class="hm-year-score" style="color: rgb(0, 255, 136);">88%</div><div class="hm-row-label year-label " style="opacity: 1;"><span class="year-icon year-peak" style="font-size:12px">★</span><span class="year-peak" style="font-family:&#39;Syne&#39;,sans-serif;font-weight:700;font-size:13px">2021</span></div><div class="cell" style="background: rgb(240, 165, 0);"></div><div class="cell" style="background: rgb(140, 165, 20);"></div><div class="cell" style="background: rgb(240, 165, 0);"></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="cell" style="background: rgb(30, 88, 30);"></div><div class="cell" style="background: rgb(20, 45, 90);"></div><div class="cell" style="background: rgb(20, 65, 30);"></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="cell" style="background: rgb(140, 165, 20);"></div><div class="cell" style="background: rgb(240, 165, 0);"></div><div class="cell" style="background: rgb(240, 165, 0);"></div><div class="cell" style="background: rgb(40, 110, 30);"></div><div class="hm-price-label"><span>$28k<br>– $69k</span></div><div class="hm-year-score" style="color: rgb(0, 255, 136);">86%</div><div class="hm-row-label year-label " style="opacity: 1;"><span class="year-icon year-crash" style="font-size:12px">☠</span><span class="year-crash" style="font-family:&#39;Syne&#39;,sans-serif;font-weight:700;font-size:13px">2022</span></div><div class="cell" style="background: rgb(30, 88, 30);"></div><div class="cell" style="background: rgb(20, 40, 25);"></div><div class="cell" style="background: rgb(20, 45, 90);"></div><div class="cell" style="background: rgb(25, 30, 100);"></div><div class="cell" style="background: rgb(30, 10, 50);"></div><div class="cell" style="background: rgb(28, 20, 75);"></div><div class="cell" style="background: rgb(25, 30, 100);"></div><div class="cell" style="background: rgb(23, 38, 95);"></div><div class="cell" style="background: rgb(25, 30, 100);"></div><div class="cell" style="background: rgb(25, 30, 100);"></div><div class="cell" style="background: rgb(28, 20, 75);"></div><div class="cell" style="background: rgb(30, 10, 50);"></div><div class="hm-price-label"><span>$15k<br>– $48k</span></div><div class="hm-year-score" style="color: rgb(0, 255, 136);">91%</div><div class="hm-row-label year-label " style="opacity: 1;"><span class="year-icon year-recover" style="font-size:12px">↑</span><span class="year-recover" style="font-family:&#39;Syne&#39;,sans-serif;font-weight:700;font-size:13px">2023</span></div><div class="cell" style="background: rgb(28, 20, 75);"><span class="cell-score score-aligned">87%</span></div><div class="cell" style="background: rgb(25, 30, 100);"><span class="cell-score score-aligned">87%</span></div><div class="cell" style="background: rgb(20, 45, 90);"><span class="cell-score score-aligned">100%</span></div><div class="cell" style="background: rgb(20, 40, 25);"><span class="cell-score score-aligned">97%</span></div><div class="cell" style="background: rgb(20, 45, 90);"><span class="cell-score score-hot">80%</span></div><div class="cell" style="background: rgb(20, 40, 25);"><span class="cell-score score-hot">80%</span></div><div class="cell" style="background: rgb(20, 65, 30);"><span class="cell-score score-aligned">90%</span></div><div class="cell" style="background: rgb(30, 88, 30);"><span class="cell-score score-hot">67%</span></div><div class="cell" style="background: rgb(20, 65, 30);"><span class="cell-score score-hot">77%</span></div><div class="cell" style="background: rgb(30, 88, 30);"><span class="cell-score score-cold">63%</span></div><div class="cell" style="background: rgb(40, 110, 30);"><span class="cell-score score-cold">53%</span></div><div class="cell" style="background: rgb(140, 165, 20);"><span class="cell-score score-cold">53%</span></div><div class="hm-price-label"><span>$17k<br>– $45k</span></div><div class="hm-year-score" style="color: rgb(255, 204, 0);">78%</div><div class="hm-row-label year-label " style="opacity: 1;"><span class="year-icon year-accum" style="font-size:12px">◈</span><span class="year-accum" style="font-family:&#39;Syne&#39;,sans-serif;font-weight:700;font-size:13px">2024</span></div><div class="cell" style="background: rgb(140, 165, 20);"><span class="cell-score score-cold">53%</span></div><div class="cell" style="background: rgb(40, 110, 30);"><span class="cell-score score-hot">70%</span></div><div class="cell" style="background: rgb(240, 165, 0);"><span class="cell-score score-diverging">40%</span></div><div class="cell" style="background: rgb(40, 110, 30);"><span class="cell-score score-hot">80%</span></div><div class="cell" style="background: rgb(30, 88, 30);"><span class="cell-score score-aligned">97%</span></div><div class="cell" style="background: rgb(30, 88, 30);"><span class="cell-score score-aligned">93%</span></div><div class="cell" style="background: rgb(40, 110, 30);"><span class="cell-score score-hot">77%</span></div><div class="cell" style="background: rgb(140, 165, 20);"><span class="cell-score score-hot">80%</span></div><div class="cell" style="background: rgb(40, 110, 30);"><span class="cell-score score-aligned">90%</span></div><div class="cell" style="background: rgb(140, 165, 20);"><span class="cell-score score-aligned">93%</span></div><div class="cell" style="background: rgb(140, 165, 20);"><span class="cell-score score-aligned">93%</span></div><div class="cell" style="background: rgb(240, 165, 0);"><span class="cell-score score-aligned">93%</span></div><div class="hm-price-label"><span>$39k<br>– $100k</span></div><div class="hm-year-score" style="color: rgb(255, 204, 0);">80%</div><div class="hm-row-label year-label " style="opacity: 1;"><span class="year-icon year-peak" style="font-size:12px">★</span><span class="year-peak" style="font-family:&#39;Syne&#39;,sans-serif;font-weight:700;font-size:13px">2025</span></div><div class="cell" style="background: rgb(240, 165, 0);"><span class="cell-score score-aligned">87%</span></div><div class="cell" style="background: rgb(40, 110, 30);"><span class="cell-score score-aligned">100%</span></div><div class="cell" style="background: rgb(30, 88, 30);"><span class="cell-score score-hot">80%</span></div><div class="cell" style="background: rgb(40, 110, 30);"><span class="cell-score score-aligned">90%</span></div><div class="cell" style="background: rgb(140, 165, 20);"><span class="cell-score score-hot">83%</span></div><div class="cell" style="background: rgb(140, 165, 20);"><span class="cell-score score-hot">80%</span></div><div class="cell" style="background: rgb(40, 110, 30);"><span class="cell-score score-aligned">90%</span></div><div class="cell" style="background: rgb(30, 88, 30);"><span class="cell-score score-aligned">90%</span></div><div class="cell" style="background: rgb(40, 110, 30);"><span class="cell-score score-aligned">90%</span></div><div class="cell" style="background: rgb(140, 165, 20);"><span class="cell-score score-aligned">100%</span></div><div class="cell" style="background: rgb(240, 165, 0);"><span class="cell-score score-aligned">100%</span></div><div class="cell" style="background: rgb(40, 110, 30);"><span class="cell-score score-aligned">87%</span></div><div class="hm-price-label"><span>$78k<br>– $112k</span></div><div class="hm-year-score" style="color: rgb(0, 255, 136);">90%</div><div class="hm-row-label year-label " style="opacity: 1;"><span class="year-icon year-crash" style="font-size:12px">☠</span><span class="year-crash" style="font-family:&#39;Syne&#39;,sans-serif;font-weight:700;font-size:13px">2026</span></div><div class="cell" style="background: rgb(20, 65, 30);"><span class="cell-score score-hot">80%</span></div><div class="cell" style="background: rgb(20, 40, 25);"><span class="cell-score score-aligned">93%</span></div><div class="cell" style="background: rgb(20, 45, 90);"><span class="cell-score score-aligned">97%</span></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="hm-price-label"><span>$55k<br>– $95k</span></div><div class="hm-year-score" style="color: rgb(0, 255, 136);">90%</div><div class="hm-row-label year-label " style="opacity: 0.5;"><span class="year-icon year-recover" style="font-size:12px">↑</span><span class="year-recover" style="font-family:&#39;Syne&#39;,sans-serif;font-weight:700;font-size:13px">2027</span></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="hm-price-label"><span>$30k<br>– $70k<span style="color:#445566"> *</span></span></div><div class="hm-year-score"></div><div class="hm-row-label year-label " style="opacity: 0.5;"><span class="year-icon year-accum" style="font-size:12px">◈</span><span class="year-accum" style="font-family:&#39;Syne&#39;,sans-serif;font-weight:700;font-size:13px">2028</span></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="hm-price-label"><span>$40k<br>– $130k<span style="color:#445566"> *</span></span></div><div class="hm-year-score"></div><div class="hm-row-label year-label " style="opacity: 0.5;"><span class="year-icon year-peak" style="font-size:12px">★</span><span class="year-peak" style="font-family:&#39;Syne&#39;,sans-serif;font-weight:700;font-size:13px">2029</span></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="hm-price-label"><span>$60k<br>– $200k<span style="color:#445566"> *</span></span></div><div class="hm-year-score"></div><div class="hm-row-label year-label " style="opacity: 0.5;"><span class="year-icon year-crash" style="font-size:12px">☠</span><span class="year-crash" style="font-family:&#39;Syne&#39;,sans-serif;font-weight:700;font-size:13px">2030</span></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="cell projected"></div><div class="hm-price-label"><span>$80k<br>– $180k<span style="color:#445566"> *</span></span></div><div class="hm-year-score"></div></div>
+  </div>
+
+  <div class="legend" id="legend"><span class="legend-label">Sentiment</span><span class="legend-swatch" style="background: rgb(30, 10, 50);"></span><span class="legend-text">Capitulation</span><span class="legend-swatch" style="background: rgb(25, 30, 100);"></span><span class="legend-text">Bear</span><span class="legend-swatch" style="background: rgb(20, 45, 90);"></span><span class="legend-text">Slight Bear</span><span class="legend-swatch" style="background: rgb(20, 40, 25);"></span><span class="legend-text">Neutral</span><span class="legend-swatch" style="background: rgb(30, 88, 30);"></span><span class="legend-text">Bullish</span><span class="legend-swatch" style="background: rgb(140, 165, 20);"></span><span class="legend-text">Mania</span><span class="legend-swatch" style="background: rgb(240, 165, 0);"></span><span class="legend-text">Peak Euphoria</span><div style="width: 100%; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgb(30, 33, 48); display: flex; align-items: center; flex-wrap: wrap; gap: 6px;">
+    <span class="legend-label" style="margin-right:6px">Cycle 3 similarity to prior cycles</span>
+    <span style="font-family:var(--font-mono);font-size:9px;color:#00ff88;font-weight:500;margin-right:2px">95%</span><span class="legend-text">Strongly aligned (≥85%) &nbsp;</span>
+    <span style="font-family:var(--font-mono);font-size:9px;color:#ffcc00;font-weight:500;margin-right:2px">72%</span><span class="legend-text">Moderately aligned (65–85%) &nbsp;</span>
+    <span style="font-family:var(--font-mono);font-size:9px;color:#66aaff;font-weight:500;margin-right:2px">52%</span><span class="legend-text">Weakly aligned (45–65%) &nbsp;</span>
+    <span style="font-family:var(--font-mono);font-size:9px;color:#ff6666;font-weight:500;margin-right:2px">30%</span><span class="legend-text">Diverging (&lt;45%)</span>
+  </div></div>
+  <div id="icon-legend-wrap">
+  <div class="icon-legend">
+    <div class="icon-legend-title">▸ Year Type Legend — 4-Year Cycle Classification</div>
+
+    <div class="icon-legend-group">
+      <div class="icon-legend-group-title year-peak">★ Peak Years — Gold</div>
+      <div class="icon-year-desc" style="margin-bottom:8px">Cycle top / peak euphoria</div>
+      <div class="icon-legend-row"><span class="year-icon year-peak">★</span><span class="icon-year-num year-peak">2017</span><span class="icon-year-desc">BTC $20k — ICO mania peak</span></div>
+      <div class="icon-legend-row"><span class="year-icon year-peak">★</span><span class="icon-year-num year-peak">2021</span><span class="icon-year-desc">BTC $69k — NFT / DeFi peak</span></div>
+      <div class="icon-legend-row"><span class="year-icon year-peak">★</span><span class="icon-year-num year-peak">2025</span><span class="icon-year-desc">BTC ~$130k — ETF / macro peak</span></div>
+      <div class="icon-legend-row" style="opacity:0.55"><span class="year-icon year-peak">★</span><span class="icon-year-num year-peak">2029</span><span class="icon-year-desc">Projected cycle peak</span></div>
+    </div>
+
+    <div class="icon-legend-group">
+      <div class="icon-legend-group-title year-accum">◈ Accumulation Years — Purple</div>
+      <div class="icon-year-desc" style="margin-bottom:8px">Cycle launch &amp; quiet build</div>
+      <div class="icon-legend-row"><span class="year-icon year-accum">◈</span><span class="icon-year-num year-accum">2016</span><span class="icon-year-desc">Pre-halving grind, ETH emerges</span></div>
+      <div class="icon-legend-row"><span class="year-icon year-accum">◈</span><span class="icon-year-num year-accum">2020</span><span class="icon-year-desc">Halving year, DeFi ignites</span></div>
+      <div class="icon-legend-row"><span class="year-icon year-accum">◈</span><span class="icon-year-num year-accum">2024</span><span class="icon-year-desc">ETF approval, new ATH</span></div>
+      <div class="icon-legend-row" style="opacity:0.55"><span class="year-icon year-accum">◈</span><span class="icon-year-num year-accum">2028</span><span class="icon-year-desc">Projected halving / launch year</span></div>
+    </div>
+
+    <div class="icon-legend-group">
+      <div class="icon-legend-group-title year-recover">↑ Recovery Years — Green</div>
+      <div class="icon-year-desc" style="margin-bottom:8px">Basing &amp; slow rebuild</div>
+      <div class="icon-legend-row"><span class="year-icon year-recover">↑</span><span class="icon-year-num year-recover">2015</span><span class="icon-year-desc">BTC $152 bottom → recovery</span></div>
+      <div class="icon-legend-row"><span class="year-icon year-recover">↑</span><span class="icon-year-num year-recover">2019</span><span class="icon-year-desc">Post-2018 bear, BTC $3.5k→$12k</span></div>
+      <div class="icon-legend-row"><span class="year-icon year-recover">↑</span><span class="icon-year-num year-recover">2023</span><span class="icon-year-desc">Post-FTX rebuild, ETF narrative born</span></div>
+      <div class="icon-legend-row" style="opacity:0.55"><span class="year-icon year-recover">↑</span><span class="icon-year-num year-recover">2027</span><span class="icon-year-desc">Projected recovery / basing year</span></div>
+    </div>
+
+    <div class="icon-legend-group">
+      <div class="icon-legend-group-title year-crash">☠ Bear / Crash Years — Red</div>
+      <div class="icon-year-desc" style="margin-bottom:8px">Capitulation &amp; wreckage</div>
+      <div class="icon-legend-row"><span class="year-icon year-crash">☠</span><span class="icon-year-num year-crash">2014</span><span class="icon-year-desc">Mt. Gox, BTC $1k → $152</span></div>
+      <div class="icon-legend-row"><span class="year-icon year-crash">☠</span><span class="icon-year-num year-crash">2018</span><span class="icon-year-desc">ICO collapse, BTC $20k → $3.2k</span></div>
+      <div class="icon-legend-row"><span class="year-icon year-crash">☠</span><span class="icon-year-num year-crash">2022</span><span class="icon-year-desc">LUNA + FTX, BTC $69k → $16k</span></div>
+      <div class="icon-legend-row"><span class="year-icon year-crash">☠</span><span class="icon-year-num year-crash">2026</span><span class="icon-year-desc">Post-peak correction (est.)</span></div>
+      <div class="icon-legend-row" style="opacity:0.55"><span class="year-icon year-crash">☠</span><span class="icon-year-num year-crash">2030</span><span class="icon-year-desc">Projected bear year</span></div>
+    </div>
+  </div></div>
+  <div class="insights" id="insights">
+    <div class="insight-card">
+      <div class="ic-eyebrow">Pattern 01</div>
+      <div class="ic-title">The Post-Peak Denial Window</div>
+      <div class="ic-body">In every cycle, CT remains <strong>stubbornly bullish for 1–2 months after the peak</strong>. Dec 2017, Nov 2021, late 2025 — all share the same signature: the crowd consistently fails to recognize the top in real time.</div>
+    </div>
+    <div class="insight-card">
+      <div class="ic-eyebrow">Pattern 02</div>
+      <div class="ic-title">The Graveyard Phase</div>
+      <div class="ic-body">Every cycle has a <strong>6–12 month CT dead zone</strong> — 2015, 2019, 2023 — where engagement collapses. Low volume, minimal YouTube views. Then quiet accumulation rebuilds, usually triggered by a macro catalyst (halving, ETF rumor, macro pivot).</div>
+    </div>
+    <div class="insight-card">
+      <div class="ic-eyebrow">Pattern 03</div>
+      <div class="ic-title">FOMO Spike → Fear Inversion</div>
+      <div class="ic-body">FOMO scores hit <strong>9–10 in the 1–3 months before/at peak</strong>, then collapse to 1–2 within 6 months. Fear scores invert: near zero at peak, climbing to 8–10 during capitulation. The FOMO-to-Fear gap averages ~8–10 months across all cycles.</div>
+    </div>
+    <div class="insight-card">
+      <div class="ic-eyebrow">Pattern 04</div>
+      <div class="ic-title">Narrative Anchoring</div>
+      <div class="ic-body">Each cycle peak has a <strong>dominant CT narrative that justifies the top</strong>: ICOs (2017), NFTs/DeFi/institutions (2021), ETFs/Trump/digital gold (2025). CT participants rationalize extreme valuations — then blame the narrative post-crash. Narrative = cope, not signal.</div>
+    </div>
+    <div class="insight-card">
+      <div class="ic-eyebrow">Pattern 05</div>
+      <div class="ic-title">The Accumulator's Isolation</div>
+      <div class="ic-body">Sentiment in <strong>graveyard years (-2 to 0) is inversely correlated with the best entry prices</strong>. 2015 CT was deeply cynical at $152 BTC. 2019 at $3.5k. 2023 post-FTX. The psychological cost of buying in the dead zone explains why almost nobody does it.</div>
+    </div>
+    <div class="insight-card">
+      <div class="ic-eyebrow">Pattern 06</div>
+      <div class="ic-title">Halving Hype Lag</div>
+      <div class="ic-body">CT builds halving narratives <strong>6–12 months early</strong>, peaks at the event, then immediately cycles through 'priced in' disillusionment for 2–3 months. The actual price impact materializes 6–12 months later — by which point CT has moved to a different narrative entirely.</div>
+    </div>
+  </div>
+</main>
+
+<div class="tooltip" id="tooltip" style="left: 707px; top: 391px;">
+    <div class="tt-title">May 2011</div>
+    <div class="tt-row"><span class="tt-key">Sentiment</span><span class="tt-val">+4 — 🔥 Extreme Mania</span></div>
+    <div class="tt-row"><span class="tt-key">FOMO Level</span><span class="tt-val">7/10</span></div>
+    <div class="tt-row"><span class="tt-key">Fear Level</span><span class="tt-val">1/10</span></div>
+    <div class="tt-narrative">BTC $30, peak mania on Bitcoin Talk</div>
+    
+  </div>
+
+<footer>
+  Data synthesized from AI knowledge of Bitcoin Talk forums, Reddit, and Crypto Twitter sentiment patterns, 2011–2026. Scores represent estimated community mood based on dominant narratives, key events, and market context. Not financial advice. † Cycle 0 (2011–2014) uses Bitcoin Talk / early Reddit as primary source — lower confidence than CT era. Cycle structure: C0 (2011–2014 peak 2013), C1 (2015–2018 peak 2017), C2 (2019–2022 peak 2021), C3 (2023–2026 peak 2025), C4 (2027–2030 projected). BTC price ranges are approximate annual highs/lows. Cycle 3 accuracy score = avg monthly similarity across all C3 months with data vs prior cycle avg.
+</footer>
+
+<script>
+// ============================================================
+// DATA
+// Format per month: [sentiment(-5to5), fomo(0to10), fear(0to10), narrative]
+// ============================================================
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// BTC approximate price range per year  [low, high] in USD
+const BTC_RANGE = {
+  2011: [0.30, 31],
+  2012: [3.80, 16],
+  2013: [13, 1242],
+  2014: [176, 1000],
+  2015: [152, 504],
+  2016: [354, 998],
+  2017: [780, 19891],
+  2018: [3122, 17135],
+  2019: [3379, 13800],
+  2020: [3858, 29300],
+  2021: [27734, 69000],
+  2022: [15460, 47835],
+  2023: [16525, 44700],
+  2024: [38500, 99800],
+  2025: [78000, 111900],
+  2026: [55000, 95000],
+  2027: [30000, 70000],
+  2028: [40000, 130000],
+  2029: [60000, 200000],
+  2030: [80000, 180000],
+};
+
+function fmtPrice(n) {
+  if (n >= 1000) return '$' + (n/1000).toFixed(0) + 'k';
+  return '$' + n;
+}
+
+const DATA = {
+  // ── PRE-CT CYCLE 0 (Bitcoin Talk / early Reddit era) ─────
+  2011: [
+    [1, 2, 3, "BTC $1, Bitcoin Talk hype, early adopters buzz"],
+    [2, 4, 2, "BTC climbs toward $10, forum mania building"],
+    [3, 5, 1, "BTC $10, major forum euphoria, 'going to $100'"],
+    [4, 7, 1, "BTC $20, Reddit/HN euphoria, mainstream whispers"],
+    [4, 7, 1, "BTC $30, peak mania on Bitcoin Talk"],
+    [5, 9, 1, "BTC $31 peak Jun 2011, forum insanity"],
+    [0, 3, 5, "BTC crashes to $16, forum panic begins"],
+    [-3, 1, 7, "BTC $8, 'it's dead' narrative dominates forums"],
+    [-3, 1, 7, "BTC $5, Bitcoin Talk near-silent"],
+    [-4, 1, 8, "BTC $3, forum ghost town"],
+    [-4, 1, 8, "BTC $2.50, only die-hards remain"],
+    [-3, 1, 7, "BTC $3, slight stabilization, slow rebuilding"],
+  ],
+  2012: [
+    [-2, 2, 6, "BTC $6, forums cautious but rebuilding"],
+    [-1, 2, 5, "BTC $5, slow steady accumulation narrative"],
+    [0, 2, 4, "BTC $5, Bitcoin Talk: 'halving will change everything'"],
+    [1, 3, 3, "BTC $5, pre-halving quiet optimism"],
+    [1, 3, 3, "BTC $5.50, halving hype grows on forums"],
+    [2, 4, 3, "BTC $7, slow climb, community hopeful"],
+    [1, 3, 3, "BTC halving block reward cut, muted reaction"],
+    [2, 4, 2, "BTC $10, Reddit crypto community forming"],
+    [2, 4, 2, "BTC $12, steady momentum, CT embryonic"],
+    [3, 5, 2, "BTC $11, community growing fast"],
+    [3, 5, 2, "BTC $12, year-end optimism strong"],
+    [4, 6, 1, "BTC $13, year-end mania seeds, Silk Road narrative"],
+  ],
+  2013: [
+    [3, 5, 2, "BTC $15, Reddit/forums buzzing with optimism"],
+    [3, 6, 2, "BTC $25, strong momentum, media whispers"],
+    [4, 7, 1, "BTC $50, mainstream media first wave"],
+    [5, 9, 1, "Cyprus bail-in, BTC $266 spike, first mainstream FOMO"],
+    [2, 5, 4, "BTC crashes to $50, forum panic then resilience"],
+    [3, 5, 2, "BTC $100, CT embryonic, Reddit mania"],
+    [3, 5, 2, "BTC $90, summer consolidation"],
+    [3, 6, 2, "BTC $120, Silk Road narrative, forum hype"],
+    [4, 7, 1, "BTC $140, momentum building across communities"],
+    [4, 7, 1, "BTC $200, CT/Reddit mania, China narrative"],
+    [5, 9, 1, "BTC $450→$1000, CT full mania, mainstream media"],
+    [5, 10, 1, "BTC $1242 peak Dec 2013, forum/CT absolute insanity"],
+  ],
+  // ── CYCLE 1 ──────────────────────────────────────────────
+  2014: [
+    [3, 6, 2, "Post-2013 euphoria hangover, CT still bullish"],
+    [1, 4, 4, "Mt. Gox collapse Feb 2014, CT shock and panic"],
+    [-2, 2, 6, "Mt. Gox aftermath, BTC $600→$450, CT scared"],
+    [-2, 2, 6, "Bear trend confirmed, CT denial phase"],
+    [-3, 1, 7, "Slow bleed, CT losing interest"],
+    [-3, 1, 7, "BTC $600 range, CT bored / bearish"],
+    [-2, 2, 6, "Summer slump, CT very quiet"],
+    [-3, 1, 7, "BTC dropping, CT fatigue"],
+    [-3, 1, 7, "BTC $400s, CT dwindling"],
+    [-4, 1, 8, "BTC $330, CT despairing"],
+    [-4, 1, 8, "BTC $360, CT nearly silent"],
+    [-4, 1, 8, "BTC $316, CT 'crypto is dead'"],
+  ],
+  2015: [
+    [-5, 1, 9, "BTC $176 Jan bottom, CT full capitulation"],
+    [-4, 1, 8, "Slight bounce, CT still fearful"],
+    [-4, 1, 8, "BTC $270, CT quiet"],
+    [-3, 1, 7, "Slow stabilization, CT cautious"],
+    [-3, 2, 6, "ETH mainnet launch, small CT spark"],
+    [-2, 2, 6, "ETH narrative, BTC stabilizes $240"],
+    [-2, 2, 5, "BTC $280, CT slight recovery"],
+    [-1, 2, 5, "BTC $260, CT slow accumulation narrative"],
+    [0, 3, 4, "BTC $230, CT turning slightly positive"],
+    [1, 3, 4, "BTC $320 breakout, CT waking up"],
+    [1, 3, 4, "BTC $370, CT hopeful"],
+    [2, 4, 3, "BTC $460, CT year-end optimism"],
+  ],
+  2016: [
+    [1, 3, 3, "BTC $430, CT halving narrative building"],
+    [1, 3, 3, "ETH DAO hype begins, BTC stable"],
+    [1, 3, 3, "Steady grind, ETH narrative strong"],
+    [2, 4, 2, "ETH $10, DAO ICO excitement"],
+    [2, 4, 2, "BTC halving month hype peaks"],
+    [1, 3, 3, "Post-halving dip, 'priced in' CT debate"],
+    [-1, 2, 4, "DAO hack, ETH fork drama, CT divided"],
+    [1, 3, 3, "Recovery, ETH fork resolves, CT rebounds"],
+    [2, 4, 2, "BTC $600, altcoin frenzy on Poloniex"],
+    [3, 5, 2, "BTC $700, CT celebrating"],
+    [3, 5, 2, "BTC $750, halving narrative returns"],
+    [4, 6, 1, "BTC $900+, year-end FOMO starts"],
+  ],
+  2017: [
+    [3, 5, 2, "BTC $1000 milestone, CT euphoric"],
+    [2, 4, 3, "Correction after $1k, 'bubble popped' FUD"],
+    [3, 5, 2, "Recovery, ETH $50 narrative builds"],
+    [4, 7, 1, "ETH rocket, ICO mania seeds planted"],
+    [3, 5, 2, "Correction, 'crypto is dead again' cycle"],
+    [4, 7, 1, "ETH $400, ICO mania full swing"],
+    [2, 4, 4, "BTC fork drama / BCH, CT divided"],
+    [3, 6, 2, "BTC recovers, ETH altseason rages"],
+    [4, 7, 1, "BTC $4k, CT pure euphoria"],
+    [3, 5, 3, "BTC correction, China FUD, CT scared"],
+    [5, 9, 1, "BTC $8k→$10k, CT full mania, laser eyes v1"],
+    [5, 10, 1, "BTC $20k peak, CT peak insanity, mainstream media"],
+  ],
+  2018: [
+    [4, 8, 2, "Still euphoric, BTC $15k, '$100k' CT calls"],
+    [1, 4, 5, "Sharp crash, 'buying the dip' cope"],
+    [-1, 2, 6, "BTC $9k, CT doubt, ICO tokens crashing"],
+    [-2, 2, 6, "BTC $7k, denial phase, 'accumulation'"],
+    [-3, 1, 7, "BTC drops, ICO death, CT confusion"],
+    [-3, 1, 7, "BTC $6k, 'floor is in' CT consensus"],
+    [-2, 2, 6, "BTC sideways, CT fatigue, low engagement"],
+    [-3, 1, 7, "BTC $6k wobble, CT anxiety"],
+    [-3, 1, 7, "SEC ETF denial, CT devastated"],
+    [-4, 1, 8, "False hope then collapse"],
+    [-5, 1, 9, "BTC $5k→$3.5k, capitulation, CT exodus"],
+    [-5, 1, 9, "BTC $3.2k, BCH hash war, CT trauma"],
+  ],
+  // ── CYCLE 2 ──────────────────────────────────────────────
+  2019: [
+    [-4, 1, 8, "BTC $3.5k, CT graveyard, dead silence"],
+    [-3, 1, 7, "'It's over' sentiment dominates CT"],
+    [-2, 2, 5, "Slight recovery, CT cautious hope"],
+    [0, 3, 4, "BTC $5k, CT awakens: 'is it back?'"],
+    [2, 5, 3, "BTC $8k, Fidelity narrative, CT excited"],
+    [3, 6, 2, "BTC $12k, 'new bull confirmed' CT"],
+    [2, 4, 3, "BTC $10k pullback, CT cautious"],
+    [0, 3, 4, "BTC $9-10k, summer slump on CT"],
+    [-1, 2, 5, "BTC $8k, CT bored and bearish"],
+    [-2, 2, 5, "BTC $7.5k, CT losing faith"],
+    [-2, 2, 5, "China buy/FUD, CT confused"],
+    [-1, 2, 5, "BTC $7k year-end, CT quiet"],
+  ],
+  2020: [
+    [-1, 2, 4, "BTC $7k, halving year narrative builds"],
+    [0, 3, 4, "BTC $9k, halving hype, DeFi murmurs"],
+    [-4, 1, 9, "COVID crash, BTC $4k, CT panic"],
+    [0, 3, 4, "V-recovery, CT relieved"],
+    [2, 5, 2, "BTC $9k pre-halving, CT excited"],
+    [1, 4, 3, "Post-halving lull, 'priced in' debate"],
+    [2, 5, 2, "DeFi summer, YFI/COMP, CT obsessed"],
+    [3, 6, 2, "DeFi mania, yield farming FOMO"],
+    [2, 4, 2, "DeFi cools, BTC narrative returns"],
+    [4, 7, 1, "BTC $13k, PayPal news, CT reignited"],
+    [4, 7, 1, "BTC $16k, Grayscale/institutional CT"],
+    [5, 9, 1, "BTC $29k, year-end mania, '2021 INSANE'"],
+  ],
+  2021: [
+    [5, 9, 1, "BTC $40k, Tesla rumors, CT full send"],
+    [4, 8, 1, "BTC $50k, Tesla buys BTC, CT euphoria"],
+    [5, 10, 1, "BTC $58k, CT first mania peak, NFTs emerge"],
+    [3, 7, 2, "BTC $50k, 'buy the dip' chorus"],
+    [2, 5, 4, "BTC $30k, Elon + China FUD, CT shaken"],
+    [-1, 2, 6, "BTC $32k, CT confused, ETH saves mood"],
+    [1, 4, 3, "BTC $40k recovery, cautious optimism"],
+    [3, 6, 2, "BTC $46k, ETH 2.0 + NFT madness"],
+    [4, 8, 1, "BTC $52k, ETH $3500, NFT season"],
+    [5, 9, 1, "BTC $60k, alts ripping, full FOMO"],
+    [5, 10, 1, "BTC ATH $69k, altseason, peak insanity 2.0"],
+    [3, 7, 2, "BTC correction from ATH, top was in"],
+  ],
+  // ── CYCLE 3 ──────────────────────────────────────────────
+  2022: [
+    [2, 5, 3, "BTC $47k, CT still bullish, 'dip buyers win'"],
+    [0, 3, 5, "BTC $38k, Russia/Ukraine FUD, CT nervous"],
+    [-1, 2, 5, "BTC $45k bounce, Fed fears grow"],
+    [-3, 1, 7, "BTC $38k, macro fears, CT rotates bearish"],
+    [-5, 1, 10, "LUNA collapse, $40B wiped, CT existential"],
+    [-4, 1, 8, "Three Arrows, Celsius collapse, CT trauma"],
+    [-3, 1, 7, "BTC $20k, CT shell-shocked but stable"],
+    [-2, 2, 6, "BTC $23k bounce, bear market rally debate"],
+    [-3, 1, 7, "ETH Merge hype, BTC $19k, CT hollow"],
+    [-3, 1, 7, "ETH Merge letdown, BTC $19k"],
+    [-4, 1, 8, "FTX collapse, SBF drama, CT panic + rage"],
+    [-5, 1, 10, "FTX aftermath, BTC $16k, CT devastation"],
+  ],
+  2023: [
+    [-4, 1, 8, "BTC $16-17k, post-FTX shock, CT graveyard"],
+    [-3, 1, 7, "BTC $21k recovery, cautious whispers"],
+    [-1, 2, 5, "BTC $28k, SVB/USDC depeg drama"],
+    [0, 3, 4, "BTC $29k stable, quiet accumulation"],
+    [-1, 2, 5, "BTC $27k, CT bored, alts dead"],
+    [0, 3, 4, "BlackRock ETF filing, CT reignites"],
+    [1, 4, 3, "BTC $29k, ETF narrative builds slowly"],
+    [2, 5, 3, "BTC $26k, CT mixed, ETF dominant"],
+    [1, 4, 3, "'Waiting for ETF' — CT patient"],
+    [2, 5, 2, "BTC $34k breakout, CT excited"],
+    [3, 6, 2, "BTC $37k, ETF expectations high"],
+    [4, 7, 1, "BTC $44k, ETF approval imminent, CT euphoric"],
+  ],
+  2024: [
+    [4, 8, 1, "BTC ETF approved Jan 10, CT explodes"],
+    [3, 6, 2, "BTC $50k, ETF inflows strong"],
+    [5, 9, 1, "BTC $73k ATH, CT mania, halving hype"],
+    [3, 6, 2, "BTC $65k, pre-halving calm euphoria"],
+    [2, 5, 3, "Post-halving lull, BTC $60k"],
+    [2, 4, 3, "BTC $65k grind, CT patient"],
+    [3, 6, 2, "BTC $66k, Trump crypto narrative, CT excited"],
+    [4, 7, 1, "BTC $65k, institutional flows strong"],
+    [3, 6, 2, "BTC recovery, confidence building"],
+    [4, 7, 1, "BTC $70k range, bull mode back"],
+    [4, 8, 1, "BTC $90k, Trump election win, CT explodes"],
+    [5, 9, 1, "BTC $98k, '$100k before year end' fever"],
+  ],
+  2025: [
+    [5, 10, 1, "BTC $105k, CT peak mania, $200k calls"],
+    [3, 7, 2, "BTC $80k correction, 'healthy pullback'"],
+    [2, 5, 3, "BTC $85k, cautious, altseason hope"],
+    [3, 6, 2, "Altseason materializes, CT excited"],
+    [4, 8, 1, "BTC $110k ATH, alts ripping, full euphoria"],
+    [4, 7, 1, "BTC $105k, summer grind, sustained high"],
+    [3, 6, 2, "BTC consolidation, CT patient bulls"],
+    [2, 5, 3, "BTC slight correction, 'accumulating'"],
+    [3, 6, 2, "BTC recovery, CT re-energized"],
+    [4, 7, 1, "BTC $120k, CT very bullish"],
+    [5, 9, 1, "BTC ~$130k peak, CT cycle top mania"],
+    [3, 6, 2, "BTC corrects, CT slowly realizing top in"],
+  ],
+  2026: [
+    [1, 3, 4, "BTC $90k, 'is the cycle over?' CT debate"],
+    [0, 2, 5, "BTC $75k, fear creeping in"],
+    [-1, 2, 5, "BTC $70k, macro uncertainty, bearish shift"],
+    null, null, null, null, null, null, null, null, null,
+  ],
+  // ── CYCLE 4 (PROJECTED) ──────────────────────────────────
+  2027: [
+    [-3, 1, 7, "BTC ~$50k, CT graveyard phase begins"],
+    [-4, 1, 8, "BTC $45k, capitulation deepens"],
+    [-4, 1, 8, "BTC $40k, CT near-silent"],
+    [-3, 1, 7, "BTC $38k, bottom-fishing narrative"],
+    [-2, 2, 6, "BTC $42k, cautious stabilization"],
+    [-1, 2, 5, "BTC $48k, CT slowly rebuilds"],
+    [0, 3, 4, "'Is this the bottom?' CT debate"],
+    [1, 3, 4, "BTC $52k, CT cautiously optimistic"],
+    [1, 4, 3, "BTC $55k, halving hype begins early"],
+    [2, 4, 3, "BTC $58k, CT re-engaging"],
+    [2, 5, 3, "BTC $60k, ETH 3.0 narratives emerge"],
+    [3, 5, 2, "BTC $65k, year-end optimism"],
+  ],
+  2028: [
+    [3, 6, 2, "BTC $70k, halving year hype builds"],
+    [3, 6, 2, "BTC $75k, institutional cycle 2 narrative"],
+    [4, 7, 1, "BTC $80k pre-halving FOMO"],
+    [3, 6, 2, "BTC $85k halving month, CT excited"],
+    [2, 4, 3, "Post-halving lull, 'priced in' again"],
+    [2, 4, 3, "BTC $80k, CT patient"],
+    [3, 6, 2, "BTC $90k, bull resumes"],
+    [4, 7, 1, "BTC $100k, CT back in mania mode"],
+    [4, 7, 1, "BTC $110k, alts stirring"],
+    [4, 8, 1, "BTC $120k, CT excited"],
+    [5, 9, 1, "BTC $130k, CT full send"],
+    [5, 9, 1, "BTC $135k, year-end euphoria"],
+  ],
+  2029: [
+    [5, 10, 1, "BTC $140k, CT mania deepens"],
+    [4, 8, 1, "BTC $150k, broader public enters"],
+    [5, 10, 1, "BTC ATH attempt ~$180k, CT peak euphoria"],
+    [4, 8, 2, "BTC $160k, correction begins"],
+    [3, 6, 3, "BTC $140k, 'healthy dip' CT"],
+    [2, 5, 3, "BTC $130k, mixed CT"],
+    [1, 4, 4, "BTC $120k, CT uncertain"],
+    [0, 3, 4, "BTC $110k, bearish rotation"],
+    [-1, 2, 5, "BTC $100k, macro fears resurface"],
+    [-2, 2, 5, "BTC $90k, CT losing confidence"],
+    [-3, 1, 6, "BTC $80k, distribution narrative"],
+    [-3, 1, 7, "BTC $70k, CT year-end fear"],
+  ],
+  2030: [
+    [-2, 1, 6, "BTC $65k, post-peak bear begins"],
+    [-3, 1, 7, "BTC $60k, CT bearish"],
+    [-4, 1, 8, "BTC $55k, capitulation signals"],
+    [-4, 1, 8, "BTC $50k, CT despairing"],
+    [-3, 1, 7, "BTC $52k, potential base"],
+    [-2, 2, 6, "BTC $55k, CT cautious"],
+    [-1, 2, 5, "BTC $58k, green shoots"],
+    [0, 3, 4, "BTC $62k, CT re-engaging"],
+    [1, 3, 4, "BTC $65k, next halving hype seeds"],
+    [1, 4, 3, "BTC $70k, CT optimistic"],
+    [2, 4, 3, "BTC $75k, bull narrative returns"],
+    [2, 5, 3, "BTC $80k, year-end confidence"],
+  ],
+};
+
+// ============================================================
+// YEAR META
+// ============================================================
+const YEAR_META = {
+  2011: { icon: '★', type: 'peak',    css: 'year-peak',    label: 'Cycle Peak (Pre-CT Era)'    },
+  2012: { icon: '↑', type: 'recover', css: 'year-recover', label: 'Recovery / Basing Year'     },
+  2013: { icon: '◈', type: 'accum',   css: 'year-accum',   label: 'Launch / Peak Year'         },
+  2014: { icon: '☠', type: 'crash',   css: 'year-crash',   label: 'Bear / Crash Year'          },
+  2015: { icon: '↑', type: 'recover', css: 'year-recover', label: 'Recovery / Basing Year'      },
+  2016: { icon: '◈', type: 'accum',   css: 'year-accum',   label: 'Accumulation / Launch Year'  },
+  2017: { icon: '★', type: 'peak',    css: 'year-peak',    label: 'Cycle Peak Year'             },
+  2018: { icon: '☠', type: 'crash',   css: 'year-crash',   label: 'Bear / Crash Year'           },
+  2019: { icon: '↑', type: 'recover', css: 'year-recover', label: 'Recovery / Basing Year'      },
+  2020: { icon: '◈', type: 'accum',   css: 'year-accum',   label: 'Accumulation / Launch Year'  },
+  2021: { icon: '★', type: 'peak',    css: 'year-peak',    label: 'Cycle Peak Year'             },
+  2022: { icon: '☠', type: 'crash',   css: 'year-crash',   label: 'Bear / Crash Year'           },
+  2023: { icon: '↑', type: 'recover', css: 'year-recover', label: 'Recovery / Basing Year'      },
+  2024: { icon: '◈', type: 'accum',   css: 'year-accum',   label: 'Accumulation / Launch Year'  },
+  2025: { icon: '★', type: 'peak',    css: 'year-peak',    label: 'Cycle Peak Year'             },
+  2026: { icon: '☠', type: 'crash',   css: 'year-crash',   label: 'Bear / Crash Year'           },
+  2027: { icon: '↑', type: 'recover', css: 'year-recover', label: 'Recovery / Basing Year'      },
+  2028: { icon: '◈', type: 'accum',   css: 'year-accum',   label: 'Accumulation / Launch Year'  },
+  2029: { icon: '★', type: 'peak',    css: 'year-peak',    label: 'Cycle Peak Year (proj.)'     },
+  2030: { icon: '☠', type: 'crash',   css: 'year-crash',   label: 'Bear / Crash Year (proj.)'   },
+};
+
+// ============================================================
+// CYCLE OVERLAY STRUCTURE
+// Cycle 0: 2011–2014 (peak 2013, Pre-CT era)
+// Cycle 1: 2015–2018 (peak 2017)
+// Cycle 2: 2019–2022 (peak 2021)
+// Cycle 3: 2023–2026 (peak 2025)  ← CURRENT — shows similarity scores
+// Cycle 4: 2027–2030 (peak 2029, projected)
+// ============================================================
+const CYCLE_STRUCTURE = [
+  {
+    label: "Cycle 0  ·  2011 – 2014  ·  Peak: Dec 2013  †  Pre-CT / Bitcoin Talk Era",
+    years: [2011, 2012, 2013, 2014],
+    labels: ["2011 ★ Yr1 ▲", "2012 ↑ Yr2", "2013 ◈ Yr3", "2014 ☠ Yr4"],
+    css:    ["year-peak","year-recover","year-accum","year-crash"],
+    preCT: true,
+  },
+  {
+    label: "Cycle 1  ·  2015 – 2018  ·  Peak: Dec 2017",
+    years: [2015, 2016, 2017, 2018],
+    labels: ["2015 ↑ Yr1", "2016 ◈ Yr2", "2017 ★ Yr3 ▲", "2018 ☠ Yr4"],
+    css:    ["year-recover","year-accum","year-peak","year-crash"],
+  },
+  {
+    label: "Cycle 2  ·  2019 – 2022  ·  Peak: Nov 2021",
+    years: [2019, 2020, 2021, 2022],
+    labels: ["2019 ↑ Yr1", "2020 ◈ Yr2", "2021 ★ Yr3 ▲", "2022 ☠ Yr4"],
+    css:    ["year-recover","year-accum","year-peak","year-crash"],
+  },
+  {
+    label: "Cycle 3  ·  2023 – 2026  ·  Peak: Nov 2025  ◀ Current Cycle",
+    years: [2023, 2024, 2025, 2026],
+    labels: ["2023 ↑ Yr1", "2024 ◈ Yr2", "2025 ★ Yr3 ▲", "2026 ☠ Yr4"],
+    css:    ["year-recover","year-accum","year-peak","year-crash"],
+    current: true,
+  },
+  {
+    label: "Cycle 4  ·  2027 – 2030  ·  Peak: ~2029  (projected)",
+    years: [2027, 2028, 2029, 2030],
+    labels: ["2027 ↑ Yr1", "2028 ◈ Yr2", "2029 ★ Yr3 ▲", "2030 ☠ Yr4"],
+    css:    ["year-recover","year-accum","year-peak","year-crash"],
+    projected: true,
+  },
+];
+
+// ============================================================
+// COLOR FUNCTIONS
+// ============================================================
+function sentimentColor(v) {
+  const steps = [
+    [-5, [30, 10, 50]],
+    [-3, [25, 30, 100]],
+    [-1, [20, 45, 90]],
+    [0,  [20, 40, 25]],
+    [1,  [20, 65, 30]],
+    [3,  [40, 110, 30]],
+    [4,  [140, 165, 20]],
+    [5,  [240, 165, 0]],
+  ];
+  let lo = steps[0], hi = steps[steps.length-1];
+  for (let i = 0; i < steps.length-1; i++) {
+    if (v >= steps[i][0] && v <= steps[i+1][0]) { lo=steps[i]; hi=steps[i+1]; break; }
+  }
+  const t = (v - lo[0]) / (hi[0] - lo[0]);
+  return `rgb(${Math.round(lo[1][0]+(hi[1][0]-lo[1][0])*t)},${Math.round(lo[1][1]+(hi[1][1]-lo[1][1])*t)},${Math.round(lo[1][2]+(hi[1][2]-lo[1][2])*t)})`;
+}
+
+function fomoColor(v) {
+  const t = v / 10;
+  return `rgb(${Math.round(10+t*245)},${Math.round(150-t*100)},${Math.round(200-t*190)})`;
+}
+
+function fearColor(v) {
+  const t = v / 10;
+  return `rgb(${Math.round(20+t*200)},${Math.round(100-t*90)},${Math.round(180-t*170)})`;
+}
+
+function getColor(d, metric) {
+  if (!d) return '#0a0b10';
+  if (metric === 'sentiment') return sentimentColor(d[0]);
+  if (metric === 'fomo')      return fomoColor(d[1]);
+  if (metric === 'fear')      return fearColor(d[2]);
+}
+
+// ============================================================
+// STATE
+// ============================================================
+let currentView = 'calendar';
+let currentMetric = 'sentiment';
+
+function setView(v) {
+  currentView = v;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  render();
+}
+
+function setMetric(m) {
+  currentMetric = m;
+  document.querySelectorAll('.metric-pill').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  render();
+}
+
+// ============================================================
+// TOOLTIP
+// ============================================================
+const tooltip = document.getElementById('tooltip');
+
+function showTooltip(e, year, month, d, corr) {
+  if (!d) return;
+  const sentLabel = d[0] >= 4 ? '🔥 Extreme Mania' : d[0] >= 2 ? '📈 Bullish' : d[0] >= 0 ? '😐 Neutral' : d[0] >= -2 ? '📉 Bearish' : d[0] >= -4 ? '😰 Fear' : '💀 Capitulation';
+  const corrHTML = corr ? (() => {
+    const simColor = corr.similarity >= 85 ? '#00ff88' : corr.similarity >= 65 ? '#ffcc00' : corr.similarity >= 45 ? '#66aaff' : '#ff6666';
+    const simLabel = corr.similarity >= 85 ? 'Strongly aligned' : corr.similarity >= 65 ? 'Moderately aligned' : corr.similarity >= 45 ? 'Weakly aligned' : 'Diverging from pattern';
+    const priorLabel = corr.priorYears.join(' & ');
+    return `
+      <div style="margin-top:8px;padding-top:6px;border-top:1px solid #1e2130">
+        <div class="tt-row"><span class="tt-key">vs ${priorLabel} avg</span><span class="tt-val">${corr.avg >= 0 ? '+' : ''}${corr.avg}</span></div>
+        <div class="tt-row"><span class="tt-key">Δ from prior avg</span><span class="tt-val">${corr.delta >= 0 ? '+' : ''}${corr.delta}</span></div>
+        <div class="tt-row"><span class="tt-key">Cycle similarity</span><span class="tt-val" style="color:${simColor}">${corr.similarity}% — ${simLabel}</span></div>
+      </div>`;
+  })() : '';
+  tooltip.innerHTML = `
+    <div class="tt-title">${MONTHS[month]} ${year}</div>
+    <div class="tt-row"><span class="tt-key">Sentiment</span><span class="tt-val">${d[0]>=0?'+':''}${d[0]} — ${sentLabel}</span></div>
+    <div class="tt-row"><span class="tt-key">FOMO Level</span><span class="tt-val">${d[1]}/10</span></div>
+    <div class="tt-row"><span class="tt-key">Fear Level</span><span class="tt-val">${d[2]}/10</span></div>
+    <div class="tt-narrative">${d[3]}</div>
+    ${corrHTML}
+  `;
+  tooltip.classList.add('visible');
+  moveTooltip(e);
+}
+
+function moveTooltip(e) {
+  const x = e.clientX + 16, y = e.clientY - 10;
+  const w = tooltip.offsetWidth, h = tooltip.offsetHeight;
+  tooltip.style.left = (x+w > window.innerWidth ? x-w-30 : x) + 'px';
+  tooltip.style.top  = (y+h > window.innerHeight ? y-h   : y) + 'px';
+}
+
+function hideTooltip() { tooltip.classList.remove('visible'); }
+
+document.addEventListener('mousemove', e => {
+  if (tooltip.classList.contains('visible')) moveTooltip(e);
+});
+
+// ============================================================
+// HELPERS
+// ============================================================
+function makeEl(tag, cls, text) {
+  const el = document.createElement(tag);
+  el.className = cls;
+  el.textContent = text;
+  return el;
+}
+
+function makePriceLabel(year) {
+  const r = BTC_RANGE[year];
+  const isProj = year >= 2027;
+  const el = document.createElement('div');
+  el.className = 'hm-price-label';
+  if (r) {
+    el.innerHTML = `<span>${fmtPrice(r[0])}<br>– ${fmtPrice(r[1])}${isProj ? '<span style="color:#445566"> *</span>' : ''}</span>`;
+  }
+  return el;
+}
+
+function makeYearLabel(year, extraCss, extraStyle) {
+  const meta = YEAR_META[year] || { icon: '·', css: '' };
+  const el = document.createElement('div');
+  el.className = `hm-row-label year-label ${extraCss || ''}`;
+  if (extraStyle) Object.assign(el.style, extraStyle);
+  el.innerHTML = `<span class="year-icon ${meta.css}" style="font-size:12px">${meta.icon}</span><span class="${meta.css}" style="font-family:'Syne',sans-serif;font-weight:700;font-size:13px">${year}</span>`;
+  return el;
+}
+
+// ============================================================
+// CYCLE CORRELATION SCORING
+// Cycle 3 years: 2023(Yr1), 2024(Yr2), 2025(Yr3), 2026(Yr4)
+// Prior cycle equivalents (same year-position):
+//   Yr1: 2011(C0), 2015(C1), 2019(C2)
+//   Yr2: 2012(C0), 2016(C1), 2020(C2)
+//   Yr3: 2013(C0), 2017(C1), 2021(C2)
+//   Yr4: 2014(C0), 2018(C1), 2022(C2)
+// Similarity % = 100 - (|delta| / 10) * 100
+// ============================================================
+const CYCLE3_PRIOR_MAP = {
+  2023: [2011, 2015, 2019],
+  2024: [2012, 2016, 2020],
+  2025: [2013, 2017, 2021],
+  2026: [2014, 2018, 2022],
+};
+
+// Also define year-pair maps for year-level scores shown in calendar view
+// Each current cycle year vs its counterpart in prior cycles
+const YEAR_PRIOR_MAP = {
+  // Cycle 3
+  2023: [2011, 2015, 2019], 2024: [2012, 2016, 2020],
+  2025: [2013, 2017, 2021], 2026: [2014, 2018, 2022],
+  // Cycle 2 vs Cycle 0+1
+  2019: [2011, 2015], 2020: [2012, 2016],
+  2021: [2013, 2017], 2022: [2014, 2018],
+  // Cycle 1 vs Cycle 0
+  2015: [2011], 2016: [2012], 2017: [2013], 2018: [2014],
+};
+
+function getMonthSimilarity(year, month) {
+  const priorYears = CYCLE3_PRIOR_MAP[year];
+  if (!priorYears) return null;
+  const c3 = DATA[year]?.[month];
+  if (!c3) return null;
+  const vals = priorYears.map(py => DATA[py]?.[month]?.[0]).filter(v => v != null);
+  if (vals.length === 0) return null;
+  const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+  const delta = c3[0] - avg;
+  const similarity = Math.round(Math.max(0, 100 - (Math.abs(delta) / 10) * 100));
+  return { similarity, delta: Math.round(delta * 10) / 10, avg: Math.round(avg * 10) / 10, c3: c3[0], priorYears };
+}
+
+// Year-level similarity: avg of all months' similarity for a given year
+function getYearSimilarity(year) {
+  const priorYears = YEAR_PRIOR_MAP[year];
+  if (!priorYears || !DATA[year]) return null;
+  const sims = [];
+  for (let m = 0; m < 12; m++) {
+    const c = DATA[year]?.[m];
+    if (!c) continue;
+    const vals = priorYears.map(py => DATA[py]?.[m]?.[0]).filter(v => v != null);
+    if (vals.length === 0) continue;
+    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+    sims.push(Math.max(0, 100 - (Math.abs(c[0] - avg) / 10) * 100));
+  }
+  if (sims.length === 0) return null;
+  return Math.round(sims.reduce((a, b) => a + b, 0) / sims.length);
+}
+
+// Cycle-level similarity: avg year similarity across the cycle
+function getCycleSimilarity(cycleYears, priorCycleYears) {
+  const sims = [];
+  cycleYears.forEach((year, yi) => {
+    const priorYear = priorCycleYears[yi];
+    if (!DATA[year] || !DATA[priorYear]) return;
+    for (let m = 0; m < 12; m++) {
+      const c = DATA[year]?.[m];
+      const p = DATA[priorYear]?.[m];
+      if (!c || !p) continue;
+      sims.push(Math.max(0, 100 - (Math.abs(c[0] - p[0]) / 10) * 100));
+    }
+  });
+  if (sims.length === 0) return null;
+  return Math.round(sims.reduce((a, b) => a + b, 0) / sims.length);
+}
+
+// Overall Cycle 3 tracking accuracy (all months with data vs prior avg)
+function getOverallC3Accuracy() {
+  const sims = [];
+  Object.keys(CYCLE3_PRIOR_MAP).forEach(yearStr => {
+    const year = parseInt(yearStr);
+    for (let m = 0; m < 12; m++) {
+      const r = getMonthSimilarity(year, m);
+      if (r !== null) sims.push(r.similarity);
+    }
+  });
+  if (sims.length === 0) return null;
+  return { score: Math.round(sims.reduce((a, b) => a + b, 0) / sims.length), n: sims.length };
+}
+
+function simCssClass(sim) {
+  if (sim >= 85) return 'score-aligned';
+  if (sim >= 65) return 'score-hot';
+  if (sim >= 45) return 'score-cold';
+  return 'score-diverging';
+}
+
+function simColor(sim) {
+  if (sim >= 85) return '#00ff88';
+  if (sim >= 65) return '#ffcc00';
+  if (sim >= 45) return '#66aaff';
+  return '#ff6666';
+}
+
+// Legacy alias
+function getCorrScore(year, month) { return getMonthSimilarity(year, month); }
+
+function addCells(hm, year, projected) {
+  const yearData = DATA[year] || [];
+  const isC3 = year in CYCLE3_PRIOR_MAP;
+
+  for (let m = 0; m < 12; m++) {
+    const d = yearData[m] || null;
+    const cell = document.createElement('div');
+
+    if (!d || projected) {
+      cell.className = 'cell projected';
+    } else {
+      cell.className = 'cell';
+      cell.style.background = getColor(d, currentMetric);
+
+      // inject similarity % score for Cycle 3 months
+      if (isC3) {
+        const corr = getMonthSimilarity(year, m);
+        if (corr !== null) {
+          const span = document.createElement('span');
+          span.className = `cell-score ${simCssClass(corr.similarity)}`;
+          span.textContent = `${corr.similarity}%`;
+          cell.appendChild(span);
+        }
+      }
+
+      cell.addEventListener('mouseenter', e => showTooltip(e, year, m, d, isC3 ? getMonthSimilarity(year, m) : null));
+      cell.addEventListener('mouseleave', hideTooltip);
+    }
+    hm.appendChild(cell);
+  }
+}
+
+// ============================================================
+// RENDER CALENDAR
+// ============================================================
+function renderCalendar(hm) {
+  hm.className = 'heatmap calendar-view';
+  hm.style.gridTemplateColumns = '72px repeat(12, 1fr) 90px 54px';
+
+  // header row
+  hm.appendChild(makeEl('div', 'hm-header', ''));
+  MONTHS.forEach(m => hm.appendChild(makeEl('div', 'hm-header', m)));
+  hm.appendChild(makeEl('div', 'hm-header', 'BTC Range'));
+  hm.appendChild(makeEl('div', 'hm-header', 'Yr Sim'));
+
+  const years = Object.keys(DATA).map(Number).sort();
+  years.forEach(year => {
+    const isProjected = year >= 2027;
+    const isPreCT = year <= 2013;
+    const rowOpacity = isProjected ? '0.5' : isPreCT ? '0.65' : '1';
+    hm.appendChild(makeYearLabel(year, '', { opacity: rowOpacity }));
+    addCells(hm, year, isProjected);
+    hm.appendChild(makePriceLabel(year));
+
+    // Year similarity score column
+    const yrSim = getYearSimilarity(year);
+    const ysEl = document.createElement('div');
+    ysEl.className = 'hm-year-score';
+    if (yrSim !== null) {
+      ysEl.style.color = simColor(yrSim);
+      ysEl.textContent = yrSim + '%';
+    }
+    hm.appendChild(ysEl);
+  });
+}
+
+// ============================================================
+// RENDER CYCLE
+// ============================================================
+function renderCycle(hm) {
+  hm.className = 'heatmap cycle-view';
+  hm.style.gridTemplateColumns = '90px repeat(12, 1fr) 90px 54px';
+
+  CYCLE_STRUCTURE.forEach((cycle, ci) => {
+    // Cycle divider header
+    const hdr = document.createElement('div');
+    const fadeOp = cycle.projected ? 0.5 : cycle.preCT ? 0.65 : 1;
+    hdr.style.cssText = `grid-column:1/-1;font-family:'Syne',sans-serif;font-weight:700;font-size:11px;letter-spacing:0.1em;color:#f0a500;padding:${ci>0?'22px':' 4px'} 0 6px;border-top:${ci>0?'1px solid #1e2130':'none'};opacity:${fadeOp}`;
+    const prefix = cycle.projected ? '⟳ ' : cycle.preCT ? '† ' : cycle.current ? '▶ ' : '◆ ';
+    hdr.textContent = prefix + cycle.label;
+    hm.appendChild(hdr);
+
+    // Month column headers
+    hm.appendChild(makeEl('div', 'hm-header', ''));
+    MONTHS.forEach(m => hm.appendChild(makeEl('div', 'hm-header', m)));
+    hm.appendChild(makeEl('div', 'hm-header', 'BTC Range'));
+    hm.appendChild(makeEl('div', 'hm-header', 'Yr Sim'));
+
+    // Year rows
+    cycle.years.forEach((year, yi) => {
+      const rowOp = cycle.projected ? 0.5 : cycle.preCT ? 0.65 : 1;
+      const lbl = document.createElement('div');
+      lbl.className = `hm-row-label ${cycle.css[yi]}`;
+      lbl.style.cssText = `font-size:9px;gap:4px;opacity:${rowOp}`;
+      lbl.innerHTML = `<span class="year-icon ${cycle.css[yi]}" style="font-size:11px">${YEAR_META[year]?.icon||'·'}</span><span style="font-family:var(--font-mono)">${cycle.labels[yi]}</span>`;
+      hm.appendChild(lbl);
+
+      addCells(hm, year, cycle.projected);
+      hm.appendChild(makePriceLabel(year));
+
+      // Year similarity score
+      const yrSim = getYearSimilarity(year);
+      const ysEl = document.createElement('div');
+      ysEl.className = 'hm-year-score';
+      ysEl.style.opacity = String(rowOp);
+      if (yrSim !== null) {
+        ysEl.style.color = simColor(yrSim);
+        ysEl.textContent = yrSim + '%';
+      }
+      hm.appendChild(ysEl);
+    });
+
+    // Cycle summary score row (skip Cycle 0 — no prior to compare)
+    if (!cycle.preCT && !cycle.projected) {
+      // Find prior cycle years (same positions)
+      let priorYears = null;
+      if (cycle.current) priorYears = [2019, 2020, 2021, 2022]; // C2 as primary prior
+      else if (ci === 2) priorYears = [2015, 2016, 2017, 2018];  // C1
+      else if (ci === 1) priorYears = [2011, 2012, 2013, 2014];  // C0
+
+      if (priorYears) {
+        const cycSim = getCycleSimilarity(cycle.years, priorYears);
+        if (cycSim !== null) {
+          const summaryRow = document.createElement('div');
+          summaryRow.className = 'cycle-score-row';
+          summaryRow.innerHTML = `
+            <span class="csr-label" style="opacity:0.6">Cycle similarity vs prior:</span>
+            <span class="csr-score" style="color:${simColor(cycSim)}">${cycSim}%</span>
+            <div class="csr-bar-wrap"><div class="csr-bar" style="width:${cycSim}%;background:${simColor(cycSim)}"></div></div>
+            <span style="font-size:9px;color:${simColor(cycSim)}">${cycSim >= 85 ? 'Strongly aligned' : cycSim >= 65 ? 'Moderately aligned' : cycSim >= 45 ? 'Weakly aligned' : 'Diverging'}</span>
+          `;
+          hm.appendChild(summaryRow);
+        }
+      }
+    }
+  });
+}
+
+function renderHeaderBadge() {
+  const acc = getOverallC3Accuracy();
+  const el = document.getElementById('header-score-badge');
+  if (!acc || !el) return;
+  const col = simColor(acc.score);
+  const label = acc.score >= 85 ? 'Strongly Tracking' : acc.score >= 65 ? 'Moderately Tracking' : acc.score >= 45 ? 'Weakly Tracking' : 'Diverging from Pattern';
+  el.innerHTML = `
+    <div class="header-score-badge">
+      <div class="hsb-label">Cycle 3 Accuracy Score</div>
+      <div class="hsb-score" style="color:${col}">${acc.score}%</div>
+      <div class="hsb-sub">${label}<br>${acc.n} months vs prior avg</div>
+    </div>
+  `;
+}
+
+// ============================================================
+// RENDER LEGEND
+// ============================================================
+function renderLegend() {
+  const leg = document.getElementById('legend');
+  leg.innerHTML = '';
+
+  if (currentMetric === 'sentiment') {
+    const steps = [
+      {v:-5,label:'Capitulation'},{v:-3,label:'Bear'},{v:-1,label:'Slight Bear'},
+      {v:0,label:'Neutral'},{v:2,label:'Bullish'},{v:4,label:'Mania'},{v:5,label:'Peak Euphoria'},
+    ];
+    leg.innerHTML = '<span class="legend-label">Sentiment</span>';
+    steps.forEach(s => {
+      const sw = makeEl('span','legend-swatch',''); sw.style.background = sentimentColor(s.v);
+      leg.appendChild(sw); leg.appendChild(makeEl('span','legend-text',s.label));
+    });
+  } else if (currentMetric === 'fomo') {
+    leg.innerHTML = '<span class="legend-label">FOMO</span>';
+    [0,2,4,6,8,10].forEach(v => {
+      const sw = makeEl('span','legend-swatch',''); sw.style.background = fomoColor(v);
+      leg.appendChild(sw); leg.appendChild(makeEl('span','legend-text',v+'/10'));
+    });
+  } else {
+    leg.innerHTML = '<span class="legend-label">Fear</span>';
+    [0,2,4,6,8,10].forEach(v => {
+      const sw = makeEl('span','legend-swatch',''); sw.style.background = fearColor(v);
+      leg.appendChild(sw); leg.appendChild(makeEl('span','legend-text',v+'/10'));
+    });
+  }
+
+  // Correlation score legend — always appended below
+  const corrRow = document.createElement('div');
+  corrRow.style.cssText = 'width:100%;margin-top:12px;padding-top:10px;border-top:1px solid #1e2130;display:flex;align-items:center;flex-wrap:wrap;gap:6px;';
+  corrRow.innerHTML = `
+    <span class="legend-label" style="margin-right:6px">Cycle 3 similarity to prior cycles</span>
+    <span style="font-family:var(--font-mono);font-size:9px;color:#00ff88;font-weight:500;margin-right:2px">95%</span><span class="legend-text">Strongly aligned (≥85%) &nbsp;</span>
+    <span style="font-family:var(--font-mono);font-size:9px;color:#ffcc00;font-weight:500;margin-right:2px">72%</span><span class="legend-text">Moderately aligned (65–85%) &nbsp;</span>
+    <span style="font-family:var(--font-mono);font-size:9px;color:#66aaff;font-weight:500;margin-right:2px">52%</span><span class="legend-text">Weakly aligned (45–65%) &nbsp;</span>
+    <span style="font-family:var(--font-mono);font-size:9px;color:#ff6666;font-weight:500;margin-right:2px">30%</span><span class="legend-text">Diverging (&lt;45%)</span>
+  `;
+  leg.appendChild(corrRow);
+}
+
+// ============================================================
+// RENDER ICON LEGEND
+// ============================================================
+function renderIconLegend() {
+  document.getElementById('icon-legend-wrap').innerHTML = `
+  <div class="icon-legend">
+    <div class="icon-legend-title">▸ Year Type Legend — 4-Year Cycle Classification</div>
+
+    <div class="icon-legend-group">
+      <div class="icon-legend-group-title year-peak">★ Peak Years — Gold</div>
+      <div class="icon-year-desc" style="margin-bottom:8px">Cycle top / peak euphoria</div>
+      <div class="icon-legend-row"><span class="year-icon year-peak">★</span><span class="icon-year-num year-peak">2017</span><span class="icon-year-desc">BTC $20k — ICO mania peak</span></div>
+      <div class="icon-legend-row"><span class="year-icon year-peak">★</span><span class="icon-year-num year-peak">2021</span><span class="icon-year-desc">BTC $69k — NFT / DeFi peak</span></div>
+      <div class="icon-legend-row"><span class="year-icon year-peak">★</span><span class="icon-year-num year-peak">2025</span><span class="icon-year-desc">BTC ~$130k — ETF / macro peak</span></div>
+      <div class="icon-legend-row" style="opacity:0.55"><span class="year-icon year-peak">★</span><span class="icon-year-num year-peak">2029</span><span class="icon-year-desc">Projected cycle peak</span></div>
+    </div>
+
+    <div class="icon-legend-group">
+      <div class="icon-legend-group-title year-accum">◈ Accumulation Years — Purple</div>
+      <div class="icon-year-desc" style="margin-bottom:8px">Cycle launch & quiet build</div>
+      <div class="icon-legend-row"><span class="year-icon year-accum">◈</span><span class="icon-year-num year-accum">2016</span><span class="icon-year-desc">Pre-halving grind, ETH emerges</span></div>
+      <div class="icon-legend-row"><span class="year-icon year-accum">◈</span><span class="icon-year-num year-accum">2020</span><span class="icon-year-desc">Halving year, DeFi ignites</span></div>
+      <div class="icon-legend-row"><span class="year-icon year-accum">◈</span><span class="icon-year-num year-accum">2024</span><span class="icon-year-desc">ETF approval, new ATH</span></div>
+      <div class="icon-legend-row" style="opacity:0.55"><span class="year-icon year-accum">◈</span><span class="icon-year-num year-accum">2028</span><span class="icon-year-desc">Projected halving / launch year</span></div>
+    </div>
+
+    <div class="icon-legend-group">
+      <div class="icon-legend-group-title year-recover">↑ Recovery Years — Green</div>
+      <div class="icon-year-desc" style="margin-bottom:8px">Basing & slow rebuild</div>
+      <div class="icon-legend-row"><span class="year-icon year-recover">↑</span><span class="icon-year-num year-recover">2015</span><span class="icon-year-desc">BTC $152 bottom → recovery</span></div>
+      <div class="icon-legend-row"><span class="year-icon year-recover">↑</span><span class="icon-year-num year-recover">2019</span><span class="icon-year-desc">Post-2018 bear, BTC $3.5k→$12k</span></div>
+      <div class="icon-legend-row"><span class="year-icon year-recover">↑</span><span class="icon-year-num year-recover">2023</span><span class="icon-year-desc">Post-FTX rebuild, ETF narrative born</span></div>
+      <div class="icon-legend-row" style="opacity:0.55"><span class="year-icon year-recover">↑</span><span class="icon-year-num year-recover">2027</span><span class="icon-year-desc">Projected recovery / basing year</span></div>
+    </div>
+
+    <div class="icon-legend-group">
+      <div class="icon-legend-group-title year-crash">☠ Bear / Crash Years — Red</div>
+      <div class="icon-year-desc" style="margin-bottom:8px">Capitulation & wreckage</div>
+      <div class="icon-legend-row"><span class="year-icon year-crash">☠</span><span class="icon-year-num year-crash">2014</span><span class="icon-year-desc">Mt. Gox, BTC $1k → $152</span></div>
+      <div class="icon-legend-row"><span class="year-icon year-crash">☠</span><span class="icon-year-num year-crash">2018</span><span class="icon-year-desc">ICO collapse, BTC $20k → $3.2k</span></div>
+      <div class="icon-legend-row"><span class="year-icon year-crash">☠</span><span class="icon-year-num year-crash">2022</span><span class="icon-year-desc">LUNA + FTX, BTC $69k → $16k</span></div>
+      <div class="icon-legend-row"><span class="year-icon year-crash">☠</span><span class="icon-year-num year-crash">2026</span><span class="icon-year-desc">Post-peak correction (est.)</span></div>
+      <div class="icon-legend-row" style="opacity:0.55"><span class="year-icon year-crash">☠</span><span class="icon-year-num year-crash">2030</span><span class="icon-year-desc">Projected bear year</span></div>
+    </div>
+  </div>`;
+}
+
+// ============================================================
+// RENDER INSIGHTS
+// ============================================================
+function renderInsights() {
+  document.getElementById('insights').innerHTML = `
+    <div class="insight-card">
+      <div class="ic-eyebrow">Pattern 01</div>
+      <div class="ic-title">The Post-Peak Denial Window</div>
+      <div class="ic-body">In every cycle, CT remains <strong>stubbornly bullish for 1–2 months after the peak</strong>. Dec 2017, Nov 2021, late 2025 — all share the same signature: the crowd consistently fails to recognize the top in real time.</div>
+    </div>
+    <div class="insight-card">
+      <div class="ic-eyebrow">Pattern 02</div>
+      <div class="ic-title">The Graveyard Phase</div>
+      <div class="ic-body">Every cycle has a <strong>6–12 month CT dead zone</strong> — 2015, 2019, 2023 — where engagement collapses. Low volume, minimal YouTube views. Then quiet accumulation rebuilds, usually triggered by a macro catalyst (halving, ETF rumor, macro pivot).</div>
+    </div>
+    <div class="insight-card">
+      <div class="ic-eyebrow">Pattern 03</div>
+      <div class="ic-title">FOMO Spike → Fear Inversion</div>
+      <div class="ic-body">FOMO scores hit <strong>9–10 in the 1–3 months before/at peak</strong>, then collapse to 1–2 within 6 months. Fear scores invert: near zero at peak, climbing to 8–10 during capitulation. The FOMO-to-Fear gap averages ~8–10 months across all cycles.</div>
+    </div>
+    <div class="insight-card">
+      <div class="ic-eyebrow">Pattern 04</div>
+      <div class="ic-title">Narrative Anchoring</div>
+      <div class="ic-body">Each cycle peak has a <strong>dominant CT narrative that justifies the top</strong>: ICOs (2017), NFTs/DeFi/institutions (2021), ETFs/Trump/digital gold (2025). CT participants rationalize extreme valuations — then blame the narrative post-crash. Narrative = cope, not signal.</div>
+    </div>
+    <div class="insight-card">
+      <div class="ic-eyebrow">Pattern 05</div>
+      <div class="ic-title">The Accumulator's Isolation</div>
+      <div class="ic-body">Sentiment in <strong>graveyard years (-2 to 0) is inversely correlated with the best entry prices</strong>. 2015 CT was deeply cynical at $152 BTC. 2019 at $3.5k. 2023 post-FTX. The psychological cost of buying in the dead zone explains why almost nobody does it.</div>
+    </div>
+    <div class="insight-card">
+      <div class="ic-eyebrow">Pattern 06</div>
+      <div class="ic-title">Halving Hype Lag</div>
+      <div class="ic-body">CT builds halving narratives <strong>6–12 months early</strong>, peaks at the event, then immediately cycles through 'priced in' disillusionment for 2–3 months. The actual price impact materializes 6–12 months later — by which point CT has moved to a different narrative entirely.</div>
+    </div>
+  `;
+}
+
+// ============================================================
+// MAIN RENDER
+// ============================================================
+function render() {
+  const hm = document.getElementById('heatmap');
+  hm.innerHTML = '';
+
+  const metricLabels = {
+    sentiment: 'Sentiment Score (−5 to +5)',
+    fomo:      'FOMO / Hype Intensity (0–10)',
+    fear:      'Fear / Capitulation Level (0–10)',
+  };
+
+  document.getElementById('section-title').textContent =
+    (currentView === 'calendar' ? 'Calendar View' : 'Cycle Overlay View') + ' — ' + metricLabels[currentMetric];
+
+  if (currentView === 'calendar') renderCalendar(hm);
+  else renderCycle(hm);
+
+  renderHeaderBadge();
+  renderLegend();
+  renderIconLegend();
+  renderInsights();
+}
+
+render();
+</script>
+
+
+</body></html>
